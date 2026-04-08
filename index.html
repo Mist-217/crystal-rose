@@ -360,6 +360,42 @@
             </div>
 
             <div class="control-section">
+                <h3>Stem & Roots</h3>
+
+                <div class="control-group">
+                    <label>Stem Height</label>
+                    <div class="slider-container">
+                        <input type="range" id="stemHeight" min="0.3" max="2.0" step="0.1" value="1.0" oninput="updateParam('stemHeight', this.value)">
+                        <span class="value-display" id="stemHeight-value">1.0</span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label>Stem Curves</label>
+                    <div class="slider-container">
+                        <input type="range" id="stemCurve" min="0" max="1" step="0.1" value="0.3" oninput="updateParam('stemCurve', this.value)">
+                        <span class="value-display" id="stemCurve-value">0.3</span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label>Leaf Clusters</label>
+                    <div class="slider-container">
+                        <input type="range" id="leafClusters" min="0" max="6" step="1" value="3" oninput="updateParam('leafClusters', this.value)">
+                        <span class="value-display" id="leafClusters-value">3</span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label>Root Tendrils</label>
+                    <div class="slider-container">
+                        <input type="range" id="rootTendrils" min="0" max="20" step="1" value="8" oninput="updateParam('rootTendrils', this.value)">
+                        <span class="value-display" id="rootTendrils-value">8</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="control-section">
                 <h3>Parameters</h3>
 
                 <div class="control-group">
@@ -482,10 +518,17 @@
             waterRipple: 0.6,
             fallingPetals: 12,
             dewDrops: 8,
+            stemHeight: 1.0,
+            stemCurve: 0.3,
+            leafClusters: 3,
+            rootTendrils: 8,
             colorPalette: ['#ffb6c1', '#ff69b4', '#e6f3ff']
         };
 
         let defaultParams = {...params};
+        let stemOffset = 0;
+        let rootPositions = [];
+        let leafPositions = [];
         let time = 0;
         let ambientParticles = [];
         let fallingPetalParticles = [];
@@ -543,6 +586,44 @@
 
             // Initialize dew drop positions on petals
             initDewDrops();
+
+            // Initialize stem offset for animation
+            stemOffset = 0;
+
+            // Initialize root positions
+            initRoots();
+
+            // Initialize leaf positions
+            initLeaves();
+        }
+
+        function initRoots() {
+            rootPositions = [];
+            let count = params.rootTendrils;
+            for (let i = 0; i < count; i++) {
+                rootPositions.push({
+                    angle: map(i, 0, count, -PI * 0.4, PI * 0.4),
+                    length: random(80, 150) * params.stemHeight,
+                    thickness: random(3, 8),
+                    curve: random(-0.5, 0.5),
+                    phase: random(TWO_PI),
+                    segments: floor(random(4, 8))
+                });
+            }
+        }
+
+        function initLeaves() {
+            leafPositions = [];
+            let count = params.leafClusters;
+            for (let i = 0; i < count; i++) {
+                let t = map(i, 0, count - 1, 0.3, 0.85);
+                leafPositions.push({
+                    t: t,
+                    side: i % 2 === 0 ? 1 : -1,
+                    size: random(0.7, 1.2),
+                    rotation: random(-0.3, 0.3)
+                });
+            }
         }
 
         function initFallingPetals() {
@@ -610,6 +691,21 @@
             // Draw ambient particles
             drawAmbientParticles();
 
+            // Draw roots first (behind everything)
+            if (params.rootTendrils > 0) {
+                drawRoots();
+            }
+
+            // Draw the crystal stem
+            if (params.stemHeight > 0) {
+                drawStem();
+            }
+
+            // Draw leaves
+            if (params.leafClusters > 0) {
+                drawLeaves();
+            }
+
             // Draw the crystal rose with dew drops
             drawCrystalRose();
 
@@ -619,6 +715,240 @@
             }
 
             pop();
+        }
+
+        function drawStem() {
+            let scaleFactor = width / 800;
+            let stemH = 180 * params.stemHeight * scaleFactor;
+            let curve = params.stemCurve * 40 * scaleFactor;
+            let stemWidth = 12 * scaleFactor;
+
+            // Animated sway
+            let sway = sin(time * 0.8) * 5 * params.stemCurve * scaleFactor;
+            let breath = sin(time * 1.5) * 2 * scaleFactor;
+
+            let c1 = hexToRgb(params.colorPalette[0]);
+            let c3 = hexToRgb(params.colorPalette[2]);
+
+            push();
+            translate(sway, stemH * 0.3);
+
+            // Main stem body with gradient
+            noStroke();
+
+            // Draw stem as tapered shape with glass effect
+            for (let w = stemWidth; w > 2; w -= 1) {
+                let alpha = map(w, stemWidth, 2, 0.3, 0.7) * params.glassOpacity;
+                let r = lerp(c1.r, 180, 0.3);
+                let g = lerp(c1.g, 200, 0.3);
+                let b = lerp(c1.b, 180, 0.3);
+                fill(r, g, b, alpha);
+
+                beginShape();
+                // Left side
+                vertex(-w * 0.5 + curve * 0.5, 0);
+                vertex(-w * 0.3 + curve, stemH * 0.5);
+                vertex(-w * 0.2 + curve * 0.3, stemH);
+                // Right side
+                vertex(w * 0.2 + curve * 0.3, stemH);
+                vertex(w * 0.3 + curve, stemH * 0.5);
+                vertex(w * 0.5 + curve * 0.5, 0);
+                endShape(CLOSE);
+            }
+
+            // Glass highlight on stem
+            stroke(c3.r, c3.g, c3.b, 0.5 * params.glassOpacity);
+            strokeWeight(2 * scaleFactor);
+            noFill();
+            beginShape();
+            for (let y = 0; y <= stemH; y += 10) {
+                let t = y / stemH;
+                let x = curve * t * t + sin(t * PI) * breath;
+                vertex(x, -y);
+            }
+            endShape();
+
+            // Central vein of stem
+            stroke(c1.r, c1.g, c1.b, 0.3 * params.glassOpacity);
+            strokeWeight(1 * scaleFactor);
+            beginShape();
+            for (let y = 0; y <= stemH; y += 10) {
+                let t = y / stemH;
+                let x = curve * t * t;
+                vertex(x, -y);
+            }
+            endShape();
+
+            pop();
+        }
+
+        function drawLeaves() {
+            let scaleFactor = width / 800;
+            let stemH = 180 * params.stemHeight * scaleFactor;
+            let curve = params.stemCurve * 40 * scaleFactor;
+            let stemWidth = 12 * scaleFactor;
+
+            let c1 = hexToRgb(params.colorPalette[0]);
+            let c2 = hexToRgb(params.colorPalette[1]);
+            let c3 = hexToRgb(params.colorPalette[2]);
+
+            for (let leaf of leafPositions) {
+                let stemY = -stemH * leaf.t;
+                let stemX = curve * leaf.t * leaf.t;
+
+                push();
+                translate(stemX, stemY);
+                rotate(leaf.side * (PI * 0.3 + leaf.rotation + sin(time + leaf.t * 10) * 0.1));
+
+                let leafLength = 50 * leaf.size * scaleFactor;
+                let leafWidth = 20 * leaf.size * scaleFactor;
+                let leafAlpha = params.glassOpacity * 0.7;
+
+                // Leaf body
+                noStroke();
+                fill(c1.r * 0.8, c1.g * 0.9, c1.b * 0.8, leafAlpha);
+                beginShape();
+                for (let s = 0; s <= 20; s++) {
+                    let t = s / 20;
+                    let w = leafWidth * sin(t * PI) * (1 - t * 0.2);
+                    let x = t * leafLength;
+                    let curve = sin(t * PI) * 5 * scaleFactor * sin(time * 0.5 + leaf.t * 5);
+                    vertex(x, -w + curve);
+                }
+                for (let s = 20; s >= 0; s--) {
+                    let t = s / 20;
+                    let w = leafWidth * sin(t * PI) * (1 - t * 0.2);
+                    let x = t * leafLength;
+                    let curve = sin(t * PI) * 5 * scaleFactor * sin(time * 0.5 + leaf.t * 5);
+                    vertex(x, w + curve);
+                }
+                endShape(CLOSE);
+
+                // Leaf vein
+                stroke(c3.r, c3.g, c3.b, leafAlpha * 0.6);
+                strokeWeight(1 * scaleFactor);
+                noFill();
+                beginShape();
+                for (let t = 0.1; t < 0.9; t += 0.1) {
+                    let x = t * leafLength;
+                    let curve = sin(t * PI) * 5 * scaleFactor * sin(time * 0.5 + leaf.t * 5);
+                    vertex(x, curve);
+                }
+                endShape();
+
+                // Leaf edge highlight
+                stroke(255, 255, 255, leafAlpha * 0.4);
+                strokeWeight(1.5 * scaleFactor);
+                beginShape();
+                for (let s = 0; s <= 10; s++) {
+                    let t = s / 10;
+                    let w = leafWidth * sin(t * PI) * (1 - t * 0.2);
+                    let x = t * leafLength;
+                    let curve = sin(t * PI) * 5 * scaleFactor * sin(time * 0.5 + leaf.t * 5);
+                    vertex(x, -w + curve);
+                }
+                endShape();
+
+                pop();
+            }
+        }
+
+        function drawRoots() {
+            let scaleFactor = width / 800;
+            let stemH = 180 * params.stemHeight * scaleFactor;
+            let curve = params.stemCurve * 40 * scaleFactor;
+            let stemWidth = 12 * scaleFactor;
+
+            let c1 = hexToRgb(params.colorPalette[0]);
+            let c2 = hexToRgb(params.colorPalette[1]);
+            let c3 = hexToRgb(params.colorPalette[2]);
+
+            // Base point where stem meets roots
+            let baseX = curve;
+            let baseY = stemH;
+
+            for (let root of rootPositions) {
+                push();
+                translate(baseX, baseY);
+
+                let rootAlpha = params.glassOpacity * 0.5;
+                let pulse = sin(time * root.phase) * 0.1 + 1;
+
+                // Root body
+                noStroke();
+                fill(c1.r * 0.6, c1.g * 0.7, c1.b * 0.6, rootAlpha);
+
+                beginShape();
+                let segLength = root.length / root.segments;
+                let prevX = 0, prevY = 0;
+
+                for (let s = 0; s <= root.segments; s++) {
+                    let t = s / root.segments;
+                    let wobble = sin(time * 2 + s + root.phase) * 5 * scaleFactor * t;
+                    let x = prevX + (segLength * cos(root.angle) + wobble) * (1 - t * 0.3);
+                    let y = prevY + segLength * sin(root.angle) * t + t * t * 20 * scaleFactor;
+
+                    let thickness = root.thickness * (1 - t * 0.7) * scaleFactor * pulse;
+
+                    if (s === 0) {
+                        vertex(x, y - thickness * 0.5);
+                        vertex(x, y + thickness * 0.5);
+                    } else {
+                        // Build outward
+                        let perpAngle = root.angle + PI * 0.5;
+                        vertex(x + cos(perpAngle) * thickness * 0.3, y + sin(perpAngle) * thickness * 0.3);
+                    }
+
+                    prevX = x;
+                    prevY = y;
+                }
+
+                // Return path
+                for (let s = root.segments; s >= 0; s--) {
+                    let t = s / root.segments;
+                    let wobble = sin(time * 2 + s + root.phase) * 5 * scaleFactor * t;
+                    let x = 0, y = 0;
+                    let tempX = 0, tempY = 0;
+
+                    for (let ss = 0; ss <= s; ss++) {
+                        let tt = ss / root.segments;
+                        let w = sin(time * 2 + ss + root.phase) * 5 * scaleFactor * tt;
+                        tempX = (tempX + (segLength * cos(root.angle) + w) * (1 - tt * 0.3));
+                        tempY = (tempY + segLength * sin(root.angle) * tt + tt * tt * 20 * scaleFactor);
+                    }
+                    x = tempX;
+                    y = tempY;
+
+                    let thickness = root.thickness * (1 - t * 0.7) * scaleFactor * pulse;
+                    let perpAngle = root.angle + PI * 0.5;
+                    vertex(x - cos(perpAngle) * thickness * 0.3, y - sin(perpAngle) * thickness * 0.3);
+                }
+                endShape(CLOSE);
+
+                // Root highlight
+                stroke(c3.r, c3.g, c3.b, rootAlpha * 0.5);
+                strokeWeight(1 * scaleFactor);
+                noFill();
+                beginShape();
+                prevX = 0; prevY = 0;
+                for (let s = 0; s <= root.segments; s++) {
+                    let t = s / root.segments;
+                    let wobble = sin(time * 2 + s + root.phase) * 5 * scaleFactor * t;
+                    let x = prevX + (segLength * cos(root.angle) + wobble) * (1 - t * 0.3);
+                    let y = prevY + segLength * sin(root.angle) * t + t * t * 20 * scaleFactor;
+                    vertex(x - t * 2, y - 1);
+                    prevX = x;
+                    prevY = y;
+                }
+                endShape();
+
+                pop();
+            }
+
+            // Root base / bulb area
+            noStroke();
+            fill(c1.r * 0.5, c1.g * 0.6, c1.b * 0.5, params.glassOpacity * 0.4);
+            ellipse(baseX, baseY, stemWidth * 2 * scaleFactor, stemWidth * 1.5 * scaleFactor);
         }
 
         function drawWaterRipples() {
@@ -973,6 +1303,10 @@
                 initFallingPetals();
             } else if (paramName === 'dewDrops') {
                 initDewDrops();
+            } else if (paramName === 'rootTendrils') {
+                initRoots();
+            } else if (paramName === 'leafClusters') {
+                initLeaves();
             }
         }
 
@@ -1034,6 +1368,14 @@
             document.getElementById('fallingPetals-value').textContent = params.fallingPetals;
             document.getElementById('dewDrops').value = params.dewDrops;
             document.getElementById('dewDrops-value').textContent = params.dewDrops;
+            document.getElementById('stemHeight').value = params.stemHeight;
+            document.getElementById('stemHeight-value').textContent = params.stemHeight;
+            document.getElementById('stemCurve').value = params.stemCurve;
+            document.getElementById('stemCurve-value').textContent = params.stemCurve;
+            document.getElementById('leafClusters').value = params.leafClusters;
+            document.getElementById('leafClusters-value').textContent = params.leafClusters;
+            document.getElementById('rootTendrils').value = params.rootTendrils;
+            document.getElementById('rootTendrils-value').textContent = params.rootTendrils;
 
             document.getElementById('color1').value = params.colorPalette[0];
             document.getElementById('color1-value').textContent = params.colorPalette[0];
